@@ -5,195 +5,350 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
+import java.util.Vector;
 
 public class queryParser {
 	
-	public static BufferedReader indexLevel3File = null;	
-	public static RandomAccessFile indexLevel2File  = null;
-	public static RandomAccessFile indexLevel1File  = null;
-	public static RandomAccessFile invertedIndexFile = null;
-	public static BufferedReader pidToTitleFile = null;
-	
- 	public static HashSet<String> stopWordsList = new HashSet<String>(Arrays.asList("a","again","about","above","across","after","against","all","almost","alone",
- 						"along","already","also","although","always","am","among","an","and","another","any","anybody","anyone","anything",
-							"anywhere","are","area","areas","aren't","around","as","ask","asked","asking","asks","at","away","b","back","backed",
-						"backing","backs","be","became","because","become","becomes","been","before","began","behind","being","beings","below",
-						"best","better","between","big","both","but","by","c","came","can","can't","cannot","case","cases","certain","certainly",
-						"clear","clearly","com","come","coord","could","couldn't","d","did","didn't","differ","different","differently","do",
-						"does","doesn't","doing","don't","done","down","downed","downing","downs","during","e","each","early","either","end",
-						"ended","ending","ends","enough","even","evenly","ever","every","everybody","everyone","everything","everywhere","f",
-						"face","faces","fact","facts","far","felt","few","find","finds","first","for","four","from","full","fully","further",
-						"furthered","furthering","furthers","g","gave","general","generally","get","gets","give","given","gives","go","going",
-						"good","goods","got","gr","great","greater","greatest","group","grouped","grouping","groups","h","had","hadn't","has",
-						"hasn't","have","haven't","having","he","he'd","he'll","he's","her","here","here's","hers","herself","high","higher",
-						"highest","him","himself","his","how","how's","however","http","https","i","i'd","i'll","i'm","i've","if","important",
-						"in","interest","interested","interesting","interests","into","is","isn't","it","it's","its","itself","j","just","k",
-						"keep","keeps","kind","knew","know","known","knows","l","large","largely","last","later","latest","least","less","let",
-						"let's","lets","like","likely","long","longer","longest","m","made","make","making","man","many","may","me","member",
-						"members","men","might","more","most","mostly","mr","mrs","much","must","mustn't","my","myself","n","nbsp","necessary",
-						"need","needed","needing","needs","never","new","newer","newest","next","no","nobody","non","noone","nor","not",
-						"nothing","now","nowhere","number","numbers","o","of","off","often","old","older","oldest","on","once","one","only",
-						"open","opened","opening","opens","or","order","ordered","ordering","orders","other","others","ought","our","ours",
-						"ourselves","out","over","own","p","part","parted","parting","parts","per","perhaps","place","places","point","pointed",
-						"pointing","points","possible","present","presented","presenting","presents","problem","problems","put","puts","q",
-						"quite","r","rather","really","right","room","rooms","s","said","same","saw","say","says","second","seconds","see",
-						"seem","seemed","seeming","seems","sees","several","shall","shan't","she","she'd","she'll","she's","should","shouldn't",
-						"show","showed","showing","shows","side","sides","since","small","smaller","smallest","so","some","somebody","someone",
-						"something","somewhere","state","states","still","such","sure","t","take","taken","td","than","that","that's","the",
-						"their","theirs","them","themselves","then","there","there's","therefore","these","they","they'd","they'll","they're",
-						"they've","thing","things","think","thinks","this","those","though","thought","thoughts","three","through","thus","to",
-						"today","together","too","took","toward","tr","turn","turned","turning","turns","two","u","under","until","up","upon",
-						"us","use","used","uses","v","very","w","want","wanted","wanting","wants","was","wasn't","way","ways","we","we'd",
-						"we'll","we're","we've","well","wells","went","were","weren't","what","what's","when","when's","where","where's",
-						"whether","which","while","who","who's","whole","whom","whose","why","why's","will","with","within","without","won't",
-						"work","worked","working","works","would","wouldn't","www","x","y","year","years","yet","you","you'd","you'll","you're",
-						"you've","young","younger","youngest","your","yours","yourself","yourselves","z",
-						
-						//This are the words which are not used in the text, these words are meta-data
-						
-						"refbegin","reflist","isbn",";",".","'","|","jpg","png","[","]","br","gt","&","lt","&gt","&lt","htm","en","php","isbn","svg",
-						"yes","wikitext","wiki","faq","edu","html","net","org","<",">","ref","refs","cite","pdf","url","web","link","abbreviation",
-						"id","caption","page","index","aspx","id","file","thumb","alt","thumbnail","defaultsort","abbr","redirect"
- 			));
- 	
+	//public static RandomAccessFile invertedIndexFile = null;
+	public static RandomAccessFile pidToTitleFile = null;
+	public static RandomAccessFile innerIndexPidTitle = null;
+	public static BufferedReader outerIndexPidTitle  = null;
+	public static HashMap <Character, BufferedReader> outerindexMap = new HashMap<Character, BufferedReader>();
+	public static HashMap <Character, RandomAccessFile> innerindexMap = new HashMap<Character, RandomAccessFile>();
+	public static HashMap <Character, RandomAccessFile> dataStoreMap = new HashMap<Character, RandomAccessFile>();
+	public static HashMap<String, Float> output = new HashMap<String, Float>();
+	public static boolean isFieldQuery = false; 
+	public static int totalWords = 0;
+	public static int ZERORESULTS = 0;
  	static long startTime = 0;
 	static long endTime = 0;
- 	
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 		
-		//	preload the index file
-		//	get the random iterator for that file
-		// 	get the handle to the pid to title map file
-		try {
-			preload();
-		} catch (NumberFormatException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		//Get the query from the user
 		System.out.print("Enter the query : ");
 		Scanner in = new Scanner(System.in);
 		String query = in.nextLine();
+		preload();
 		
-		queryParser.startTime = System.currentTimeMillis();
-		
-		parseQuery(query.toLowerCase());
-		
-		
-	}
-
-	private static void parseQuery(String query) {
-		
-		//	break the query in words
-		String queryWords[] = query.trim().split(" ");
-		int queryLengthInWords = queryWords.length;
-		
-		//	remove the stop words
-		List <String> refinedQueryWords = new ArrayList <String>() ;
-		stemmer s = new stemmer();
-		
-		for(int i = 0; i < queryLengthInWords; i++) {
-			
-			
-			if(!isStopWord(queryWords[i])) {
-				
-				//Get stemmer in action
-				s.add(queryWords[i].toCharArray(), queryWords[i].length());
-				try {
-					queryWords[i] = s.stem().toString();
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-				refinedQueryWords.add(queryWords[i]);
-				//System.out.println(queryWords[i]);
-			}
-		}
-		//	get the posting list of the query
-		if(queryWords[0].length() > 2)
-			try {
-				getList(queryWords[0]);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-	}
-
-	private static void getList(String queryWord) throws IOException {
-
-		//Access the third level
-		String lineInThirdLevel = null;
-		long startOffset = 0, endOffset = 0, lastOffset = 0;
-		
-		while((lineInThirdLevel = indexLevel3File.readLine()) != null) {
-			
-			if(lineInThirdLevel.split(":")[0].compareTo(queryWord) == 0) {
-				
-				startOffset = Long.parseLong(lineInThirdLevel.split(":")[1]);
-				
-			} else if(lineInThirdLevel.split(":")[0].compareTo(queryWord) == 1) {
-				
-				//System.out.println(lineInThirdLevel + " " + queryWord);
-				
-				if(startOffset == 0){
-					
-					startOffset = lastOffset;
-				}
-				endOffset = Long.parseLong(lineInThirdLevel.split(":")[1]);
-				break;
-				
-			} else {
-				
-				lastOffset = Long.parseLong(lineInThirdLevel.split(":")[1]); 
-			}
-		}
-		
-		System.out.println(startOffset + " " + endOffset);
+		startTime = System.currentTimeMillis();		
+		query = query.toLowerCase().replaceAll(".-|of","").trim();
+		query = query.replaceAll("( )+"," ");
+		parseQuery(query.toLowerCase().replaceAll("\\!\\@#\\$%+\\^\\&;\\*'.>\\-<"," ").trim());			
 		endTime = System.currentTimeMillis();
 		System.out.println("Execution Time : " + (float)(endTime - startTime) / 1000 + " s");
-		
-		//Access the second level
-		
-		//Access the first level		
-		
 	}
 
-	private static boolean isStopWord(String word) {
+	private static void parseQuery(String query) throws Exception {
 		
-		return stopWordsList.contains(word);
+		//	break the query in words
+		query =  query.replaceAll(": ", ":");
+		int len = query.length();
+		StringBuilder queryString = new StringBuilder(query);
+		List <String> refinedQueryWords = new ArrayList <String>() ;
+		stemmer s = new stemmer();
+		String secWords[][] = new String[10][2];
+		
+		for(int i = 0; i < len; i++){			
+			if(queryString.charAt(i) == ':') {
+				isFieldQuery = true;
+				if(i - 2 >= 0)
+					queryString.setCharAt(i - 2, '$');
+			}
+		}
+		
+		if(isFieldQuery) {
+			
+			//tikenoze on "$"
+			String queryWords[] = queryString.toString().split("\\$");
+			len = queryWords.length;
+			
+			for(int i = 0; i < len; i++) {
+				String secWord[] = queryWords[i].split(":");
+				String queryWordsList[] = secWord[1].split(" ");
+				int length = queryWordsList.length;
+				//System.out.println(secWord[1]);
+				for(int j = 0; j < length; j++) {
+					s.add(queryWordsList[j].toCharArray(), queryWordsList[j].length());
+					secWords[totalWords][0] = s.stem().toString();;
+					secWords[totalWords++][1] = secWord[0]; 
+				}
+			}
+		} else {
+			//tokeinze on the basis of space " "
+			String queryWordsList[] = query.split(" ");
+			len = queryWordsList.length;
+			for(int i = 0; i < len; i++) {
+				secWords[i][0] = queryWordsList[i];
+				totalWords++;
+			}
+		}		
+		//	get the posting list of the query
+		for(int i = 0; i < totalWords; i++){			
+			mergeList(getList(secWords[i][0]), secWords[i][1], i + 1);
+			if(ZERORESULTS == 1) {
+				System.out.println("No matching document found...");
+				System.exit(0);
+			}				
+		}
+			
+		//Iterate throught map
+		int resultCount = 0;
+		List <String> searchResultOutput = new ArrayList<String>();
+		
+		Iterator it = output.entrySet().iterator();
+		while (it.hasNext()) {
+			resultCount++;
+			Map.Entry pair = (Map.Entry)it.next();
+			searchResultOutput.add(pair.getKey() + "=" + pair.getValue());
+			it.remove(); 
+		}
+		
+		Collections.sort(searchResultOutput, new Comparator<String>(){
+			@Override
+			public int compare(String s1, String s2) {
+				float value1 = Float.parseFloat(s1.split("=")[1]);
+				float value2 = Float.parseFloat(s2.split("=")[1]);
+				if(value1 == value2)
+					return 0; 
+				else if (value1 < value2)
+					return -1;
+				else
+					return 1;
+			}
+		});
+		
+		//Load the inner map of pidtotitle map file in random access
+		innerIndexPidTitle = new RandomAccessFile("innerIndex", "r");
+		
+		//Now load the pidtotitlemapfile into the memory
+		pidToTitleFile = new RandomAccessFile("pIDToTitleMap", "r");
+		
+		
+		System.out.println("\nSearch returned following results : \n");
+		
+		//What if I sort on the basis of pid and then fetch the index of the pid to title
+		Vector <String> pid = new Vector<String>();
+		for(int i = 0; i < resultCount ; i++) {
+			pid.add((searchResultOutput.get(i).split("=")[0]));
+		}
+		
+		Collections.sort(pid, new Comparator<String>(){
+			@Override
+			public int compare(String s1, String s2) {
+				Integer value1 = Integer.parseInt(s1);
+				Integer value2 = Integer.parseInt(s2);
+				if(value1 == value2)
+					return 0; 
+				else if (value1 < value2)
+					return -1;
+				else
+					return 1;
+			}
+		});
+		
+		int count = 0;
+		//fetch the title from the pid	
+		for(int i = 0; count < 10 && i < resultCount ; i++) {
+			//(getTitleOfpId(searchResultOutput.get(i).split("=")[0]));
+			String temp = getTitleOfpId(pid.get(i));
+			//if(temp.compareTo("Wikipedia") == 0) continue;
+			System.out.println(count + 1 + ":" + temp);
+			count++;
+		}
+		
+		innerIndexPidTitle.close();
+		pidToTitleFile.close();
+	}
+	
+	private static void closeAll() throws IOException {
+		
+		//Get the handle to the index files
+		for(int i = 0; i < 26; i++) {			
+			//indexMap.put((char)('a' + i), new BufferedReader(new FileReader(new File((char)('a' + i) + "index"))));
+			innerindexMap.get((char)('a' + i)).close();
+		}
+		
+		//Get the handles to the datastore file
+		for(int i = 0; i < 26; i++) {			
+			dataStoreMap.get((char)('a' + i)).close();
+		}
+		
+		//	Get the handle to the inner title index file
+		innerIndexPidTitle = new RandomAccessFile(new File("innerIndex"),"r");
+		
+		//	Get the handle to the pid to tile map file
+		pidToTitleFile = new RandomAccessFile(new File("pIDToTitleMap"), "r");		
 	}
 
+	private static void mergeList(String list, String secWords, int callTime) {
+		
+		if(list == null || ZERORESULTS == 1){
+			ZERORESULTS = 1;
+			return;
+		}		
+		
+		if(isFieldQuery) {
+			
+			int score = 0;
+			switch(secWords) {
+				case "t": 	//	title
+					score = 1;				
+					break;
+				case "i": 	//"infobox":
+					score = 2;
+					break;
+				case "e": 	//	externalLinks"
+					score = 4;
+					break;	
+				case "r":	//"references":
+					score = 8;
+					break;	
+				case "c": 	//	"category":
+					score = 16;
+					break;
+				case "b": 	//optionIndex = 5;
+					score = 32;
+					break;
+			}
+			String line[] = list.split(":");
+			int len = line.length;
+			
+			for(int i = 1; i < len && i < 200; i++){				
+				String inside[] = line[i].split("=");
+				if((score & Integer.parseInt(inside[1].split(",")[0])) >= 1){					
+					if(callTime != 1) {
+						if(output.containsKey(inside[0])) {
+							output.put(inside[0], output.get(inside[0]) + Float.parseFloat(inside[1].split(",")[1]));
+						} else {
+							output.remove(inside[0]);
+						}
+					} else {
+						output.put(inside[0], Float.parseFloat(inside[1].split(",")[1]));
+					}
+				}
+			}
+		} else {
+			String line[] = list.split(":");
+			int len = line.length;			
+			for(int i = 1; i < len && i < 200; i++) {
+				String inside[] = line[i].split("=");
+				if(callTime != 1) {
+					if(output.containsKey(inside[0])) {
+						output.put(inside[0], output.get(inside[0]) + Float.parseFloat(inside[1].split(",")[1]));
+					} else {
+						output.put(inside[0], Float.parseFloat(inside[1].split(",")[1]));
+					}
+				} else {
+					output.put(inside[0], Float.parseFloat(inside[1].split(",")[1]));
+				}
+			}
+		}
+	}
+
+	private static String getList(String queryWord) throws IOException {
+		
+		char c1 = queryWord.charAt(0);
+		String line = null, startOffset = "0", endOffset = "0";
+		if(outerindexMap.get(c1) == null){
+			outerindexMap.put(c1, new BufferedReader(new FileReader(String.valueOf(c1) + "outerIndex"))); 
+		}
+		
+		while((line = outerindexMap.get(c1).readLine()) != null){
+			if(line.split(":")[0].compareTo(queryWord) < 0) {
+				startOffset = line.split(":")[1];
+			} else if(line.split(":")[0].compareTo(queryWord) >= 0) {
+				endOffset = line.split(":")[1]; 
+				break;
+			}
+		}
+		
+		//Get the block into the memory
+		//but before that open the file for using random access
+		if(innerindexMap.get(c1) == null){
+			innerindexMap.put(c1, new RandomAccessFile(new File(String.valueOf(c1) + "innerIndex"),"r")); 
+		}
+		
+		HashMap <String, Long> mymap = new HashMap <String, Long>();
+		innerindexMap.get(c1).seek(Long.parseLong(startOffset));
+		
+		Long offset = Long.parseLong(startOffset);
+		line = null;
+		while((line = innerindexMap.get(c1).readLine()) != null){
+			mymap.put(line.split(":")[0], Long.parseLong(line.split(":")[1]));
+			offset = offset + line.length() + 1;
+			if(offset > Long.parseLong(endOffset))
+				break;
+		}
+		innerindexMap.get(c1).close();
+		
+		if(dataStoreMap.get(c1) == null){
+			dataStoreMap.put(c1, new RandomAccessFile(new File(String.valueOf(c1) + "DateStore"),"r"));
+		}
+		if(mymap.get(queryWord) == null) {
+			dataStoreMap.get(c1).close();
+			mymap.clear();
+			ZERORESULTS = 1;
+			return null;
+		}
+			
+		dataStoreMap.get(c1).seek(mymap.get(queryWord));
+		line =  dataStoreMap.get(c1).readLine();
+		
+		dataStoreMap.get(c1).close();
+		mymap.clear();
+		return line;
+	}
+	
 	private static void preload() throws NumberFormatException, IOException {
 		
-		//Get the handle to the index file
-		try {
-			 indexLevel3File = new BufferedReader(new FileReader(new File("indexLevel3")));
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
+		//date store files
+		for(int i = 0; i < 26; i++) {			
+			outerindexMap.put((char)('a' + i), new BufferedReader(new FileReader((char)('a' + i) + "outerIndex")));
 		}
 		
-		//Get the handle to the main data file
-		try {
-			invertedIndexFile = new RandomAccessFile(new File("Index"), "r");
-			indexLevel1File = new RandomAccessFile(new File("indexLevel1"), "r");
-			indexLevel2File = new RandomAccessFile(new File("indexLevel2"), "r");
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
+		//Index files
+		outerIndexPidTitle = new BufferedReader(new FileReader(new File("outerIndex")));
+	}
+	
+	private static String getTitleOfpId(String pID) throws IOException{
+		
+		//System.out.println(pID);
+		
+		String line = null;
+		String startOffset = "0", endOffset = "0";
+		
+		while((line = outerIndexPidTitle.readLine()) != null) {
+			if(Long.parseLong(line.split(":")[0]) > Long.parseLong(pID)) {
+				endOffset = line.split(":")[1];
+				break;
+			}
+			startOffset = line.split(":")[1];
 		}
 		
-		//Get the handle to the pid to tile map file
-		try {
-			pidToTitleFile = new BufferedReader(new FileReader(new File("pIDToTitleMap")));
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
+		HashMap <String, Long> mymap = new HashMap <String, Long>();		
+		innerIndexPidTitle.seek(Long.parseLong(startOffset));
+		
+		Long offset = Long.parseLong(startOffset);
+		int counter = 0;
+		line = null;
+		while((line = innerIndexPidTitle.readLine()) != null){
+			//System.out.println(line);
+			mymap.put(line.split(":")[0], Long.parseLong(line.split(":")[1]));
+			if(counter++ == 1000)
+				break;
 		}
+		
+		pidToTitleFile.seek(mymap.get(pID));
+		
+		line = pidToTitleFile.readLine().split(":")[1];
+		mymap.clear();
+		return line;
 	}
 }
